@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   minWidth="955" minHeight="600"
+			   creationComplete="application_creationCompleteHandler(event)">
+	<fx:Metadata>
+		// Strings resource file
+		[ResourceBundle("resources")]
+	</fx:Metadata> 
+	<fx:Declarations>
+		<!-- Flower App Supported Languages REST Call --> 
+		<s:HTTPService id="flowerServiceLangRequest"
+					   useProxy="false" method="GET" resultFormat="e4x"
+					   result="flowerServiceLangRequest_resultHandler(event)"
+					   fault="flowerServiceLangRequest_faultHandler(event)"> 
+		</s:HTTPService> 
+		
+		<!-- Flower App Supported Markets REST Call --> 
+		<s:HTTPService id="flowerServiceMarketRequest"
+					   useProxy="false" method="GET" resultFormat="e4x"
+					   result="flowerServiceMarketRequest_resultHandler(event)"
+					   fault="flowerServiceMarketRequest_faultHandler(event)">
+		</s:HTTPService>
+
+		<!-- Flower App Supported Flowers REST Call --> 
+		<s:HTTPService id="flowerServiceFlowerRequest"
+					   useProxy="false" method="GET" resultFormat="e4x"
+					   result="flowerServiceFlowerRequest_resultHandler(event)"
+					   fault="flowerServiceFlowerRequest_faultHandler(event)">
+		</s:HTTPService>
+</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.globalization.DateTimeFormatter;
+			import flash.globalization.LocaleID;
+			
+			import mx.events.FlexEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			//******************************************
+			// CONSTANTS
+			protected const URL_BASE: String = "http://flowerservice20160406025332.azurewebsites.net";
+			protected const URL_LANGUAGES: String = "/languages";
+			protected const URL_MARKETS: String = "/markets";
+			protected const URL_FLOWERS: String = "/flowers";
+						
+			
+			//******************************************
+			// MODEL OBJECTS
+			// Normally, I'd convert these to actual strongly-typed class objects but just use Object here
+			protected var faLanguages: Array = new Array();
+			protected var faMarkets: Array = new Array();
+			protected var faFlowers: Array = new Array();
+			
+			//******************************************
+			// ATTRIBUTES
+			/* Initially set the preferred locale to use the user's default linguistic preferences, as specified in the
+			user's operating system settings. For example, such preferences are typically set using the "Control Panel"
+			for Windows, or the "System Preferences" in Mac OS X.
+			*/
+			[Bindable]
+			protected var preferredLocale: String = LocaleID.DEFAULT;
+			
+			/* Create a locale ID class.
+			
+			The LocaleID class provides methods for parsing and using locale ID names. This class supports locale ID
+			names that use the syntax defined by the Unicode Technical Standard #35 (http://unicode.org/reports/tr35/).
+			*/
+			[Bindable]
+			protected var localeId:LocaleID;
+			
+			/* The DateTimeFormatter class provides locale-sensitive formatting for Date objects and access to localized
+			date field names. The methods of this class use functions and settings provided by the operating system.
+			There are two ways to select a date time format: using a predefined pattern or a custom pattern. For most
+			applications the predefined styles specified by the DateTimeStyle constants (LONG, MEDIUM, NONE, or SHORT
+			should be used. These constants specify the default patterns for the requested locale or the default patterns
+			based on the user's operating system settings.
+			
+			When an instance of this class is created, if the requested locale is supported by the operating system then
+			the properties of the instance are set according to the conventions and defaults of the requested locale and
+			the constructor's dateStyle and timeStyle parameters. If the requested locale is not available, then the
+			properties are set according to a fallback or default system locale, which can be retrieved using the
+			actualLocaleIDName property.
+			
+			This class contains additional methods to get localized strings for month names and weekday names, and to
+			retrieve the first day of the week that can be used in a calendar picker or other similar application.
+			
+			Due to the use of the user's settings, the use of formatting patterns provided by the operating system,
+			and the use of a fallback locale when a requested locale is not supported, different users can see different
+			formatting results even when using the same locale ID.
+			*/
+			[Bindable]
+			protected var dateTimeFormatter: DateTimeFormatter;
+			
+			//******************************************
+			// METHODS		
+			protected function application_creationCompleteHandler(event:FlexEvent):void {
+				// Create a new date/time formatter object based on the preferred locale.
+				dateTimeFormatter = new DateTimeFormatter(preferredLocale);
+				
+				// Create a new locale ID object based on the locale name from the date time formatter
+				localeId = new LocaleID(dateTimeFormatter.actualLocaleIDName);
+				
+				// Call the Flower Services
+				flowerServiceLangRequest.url = URL_BASE + URL_LANGUAGES;
+				flowerServiceLangRequest.send();
+				flowerServiceMarketRequest.url = URL_BASE + URL_MARKETS;
+				flowerServiceMarketRequest.send();
+				flowerServiceFlowerRequest.url = URL_BASE + URL_FLOWERS;
+				flowerServiceFlowerRequest.send();
+			}
+			
+			//-----------------------------------------------------------------------------			
+			protected function flowerServiceLangRequest_resultHandler(event:ResultEvent):void
+			{
+				var languages: Array = JSON.parse(event.result.toString()) as Array;
+				var output: String = "";
+				for (var index:Object in languages) {
+					var language: Object = languages[index];
+
+					// Save the data
+					faLanguages.push(language);
+					var temp:Array = language["LocalizedNames"];
+					output += language["NativeName"] + " (" + language["LocalizedNames"][0]["Value"] + ")";
+					if (index < languages.length-1) {
+						output += "\n";
+					}
+				}
+				flowerServiceLanguages.text = output;
+			}
+
+			//-----------------------------------------------------------------------------			
+			protected function flowerServiceLangRequest_faultHandler(event:FaultEvent):void
+			{
+				flowerServiceLanguages.text = event.message.toString();
+			}
+			
+			//-----------------------------------------------------------------------------			
+			protected function flowerServiceMarketRequest_resultHandler(event:ResultEvent):void
+			{
+				var markets: Array = JSON.parse(event.result.toString()) as Array;
+				var output: String = "";
+				for (var index:Object in markets) {
+					var market: Object = markets[index];
+					
+					// Save the data
+					faMarkets.push(market);
+
+					output += market["GlobalMarketName"] + " ( ";
+					for (var kvPairIndex: Object in market["MarketName"]) {
+						var kvPair:Object = market["MarketName"][kvPairIndex];
+						output += kvPair["Value"];
+						
+						if (kvPairIndex < market["MarketName"].length-1) {
+							output += " , ";
+						}
+					}
+
+					output += " )\n";
+				}
+				
+				flowerServiceMarkets.text = output;
+			}
+			
+			//-----------------------------------------------------------------------------			
+			protected function flowerServiceMarketRequest_faultHandler(event:FaultEvent):void
+			{
+				flowerServiceMarkets.text = event.message.toString();
+			}
+			
+			//-----------------------------------------------------------------------------			
+			protected function flowerServiceFlowerRequest_resultHandler(event:ResultEvent):void
+			{
+				var flowers: Array = JSON.parse(event.result.toString()) as Array;
+				var output: String = "";
+				for (var index:Object in flowers) {
+					var flower: Object = flowers[index];
+					
+					faFlowers.push(flower);
+					
+					output += flower["GlobalDisplayName"] + " - " + 
+						      flower["PriceInfoOfCurrentBillingRegion"]["Currency"] +
+							  flower["PriceInfoOfCurrentBillingRegion"]["Price"] + " (";
+					for (var kvPairIndex: Object in flower["DisplayName"]) {
+						var kvPair: Object = flower["DisplayName"][kvPairIndex];
+						output += kvPair["Value"];
+							
+						if (kvPairIndex < flower["DisplayName"].length-1) {
+							output += " , ";
+						}
+					}
+					output += " )\n";
+				}
+				flowerServiceFlowers.text = output;
+				
+			}
+			
+			//-----------------------------------------------------------------------------			
+			protected function flowerServiceFlowerRequest_faultHandler(event:FaultEvent):void
+			{
+				flowerServiceFlowers.text = event.message.toString();				
+			}
+			
+		]]>
+	</fx:Script>
+	<s:Panel id="mainPanel" title="{resourceManager.getString('resources','appTitle')}"
+			 verticalCenter="0" horizontalCenter="0" minWidth="400">
+		<s:VGroup id="vg" top="10" left="10" right="10" bottom="10">
+			<s:Form id="form" x="10" y="10">
+				<!-- Reduce gap between form items. -->
+				<s:layout>
+					<s:FormLayout gap="-10"/>
+				</s:layout>  
+				<s:FormItem id="lblPrefLocale" label="{resourceManager.getString('resources','prefLocale')}">
+					<s:Label id="prefLocale" text="{localeId.name}"/>
+				</s:FormItem>
+				<s:FormItem id="lblFlowerServiceLanguages" label="{resourceManager.getString('resources','flowerServiceLanguages')}">
+					<s:Label id="flowerServiceLanguages" text="{resourceManager.getString('resources','loading')}"/>
+				</s:FormItem>
+				<s:FormItem id="lblFlowerServiceMarkets" label="{resourceManager.getString('resources','flowerServiceMarkets')}">
+					<s:Label id="flowerServiceMarkets" text="{resourceManager.getString('resources','loading')}"/>
+				</s:FormItem>
+				<s:FormItem id="lblFlowerServiceFlowers" label="{resourceManager.getString('resources','flowerServiceFlowers')}">
+					<s:Label id="flowerServiceFlowers" text="{resourceManager.getString('resources','loading')}"/>
+				</s:FormItem>
+			</s:Form>
+		</s:VGroup>
+	</s:Panel> 
+</s:Application>
